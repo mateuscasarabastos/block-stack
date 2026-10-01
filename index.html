@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Bolo Stack - Deliciosa Empilhadeira de Bolos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #111;
+      color: #fff;
+    }
+    #game {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
+    .modal-backdrop {
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+    }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 8px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.5); }
+
+    .glow-gold { box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); }
+
+    @keyframes pulseSoft {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .pulse-soft { animation: pulseSoft 2s infinite ease-in-out; }
+  </style>
+</head>
+<body class="relative w-full h-full overflow-hidden bg-slate-900 select-none">
+
+<canvas id="game"></canvas>
+
+<!-- Top Left: Coin Display -->
+<div id="coinCounter" class="fixed top-4 left-4 z-30 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-amber-500/30 shadow-lg text-amber-400 font-bold text-xl pointer-events-none">
+  <span class="text-2xl">🪙</span>
+  <span id="coins">0</span>
+</div>
+
+<!-- Top Center: In-Game Score & Stage Info -->
+<div id="ui" class="fixed top-4 left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none transition-all duration-300">
+  <div id="score" class="text-5xl font-black tracking-wider text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">0</div>
+  <div id="stageBadge" class="inline-block mt-1 px-3 py-0.5 bg-amber-500/80 text-amber-950 font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md">
+    1. Subterrâneo
+  </div>
+  <div id="message" class="mt-2 text-sm font-semibold text-white/90 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+    Toque na tela para colocar a camada de bolo
+  </div>
+</div>
+
+<!-- Top Right: Action Controls -->
+<div class="fixed top-4 right-4 z-30 flex gap-2">
+  <button id="resetButton" type="button" aria-label="Reiniciar jogo" title="Reiniciar jogo" class="w-11 h-11 bg-slate-800/80 hover:bg-slate-700 text-white font-bold rounded-2xl border border-white/20 shadow-lg backdrop-blur-md flex items-center justify-center text-xl transition active:scale-95">
+    ↻
+  </button>
+  <button id="pauseButton" type="button" aria-label="Pausar jogo" title="Pausar jogo" class="w-11 h-11 bg-slate-800/80 hover:bg-slate-700 text-white font-bold rounded-2xl border border-white/20 shadow-lg backdrop-blur-md flex items-center justify-center text-xl transition active:scale-95">
+    Ⅱ
+  </button>
+</div>
+
+<!-- Start Screen -->
+<div id="startScreen" class="fixed inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-b from-amber-950/90 via-slate-900/90 to-slate-950/95 backdrop-blur-lg p-4">
+  <button id="skinsButton" type="button" class="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black px-6 py-2.5 rounded-2xl shadow-lg border-2 border-amber-300 flex items-center gap-2 transition transform hover:scale-105 active:scale-95">
+    <span class="text-xl">🎨</span> Skins & Loja
+  </button>
+
+  <div class="text-center my-6">
+    <div class="text-6xl mb-2 animate-bounce">🎂</div>
+    <h1 class="text-5xl md:text-6xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-pink-400 to-rose-400 drop-shadow-lg">
+      Bolo Stack
+    </h1>
+    <p class="text-slate-300 text-sm mt-1 font-medium">Construa a maior torre de bolos do universo!</p>
+  </div>
+
+  <div class="w-full max-w-sm flex flex-col items-center gap-4">
+    <button id="playButton" type="button" class="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-2xl rounded-2xl shadow-xl shadow-orange-500/30 border-2 border-amber-200 transition transform hover:-translate-y-1 active:translate-y-0">
+      JOGAR AGORA
+    </button>
+
+    <div class="w-full mt-2">
+      <div id="difficultyTitle" class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 text-center">
+        Dificuldade Selecionada
+      </div>
+      <div id="difficultyOptions" class="bg-slate-800/80 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
+        <div id="difficultyHeader" class="flex justify-between px-4 py-2 bg-slate-900/80 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+          <span>Modo</span>
+          <span>Recorde</span>
+        </div>
+        <button class="difficultyButton w-full px-4 py-3 flex items-center justify-between border-b border-slate-700/50 hover:bg-white/5 transition" id="easyButton" type="button">
+          <span class="difficultyName flex items-center gap-2 font-bold text-emerald-400"><span class="difficultyMarker w-5 text-center"></span>Fácil</span>
+          <span class="difficultyRecord text-sm text-slate-300 font-bold">Recorde 0</span>
+        </button>
+        <button class="difficultyButton selected w-full px-4 py-3 flex items-center justify-between border-b border-slate-700/50 hover:bg-white/5 transition bg-amber-500/10" id="normalButton" type="button">
+          <span class="difficultyName flex items-center gap-2 font-bold text-amber-400"><span class="difficultyMarker w-5 text-center">★</span>Normal</span>
+          <span class="difficultyRecord text-sm text-slate-300 font-bold">Recorde 0</span>
+        </button>
+        <button class="difficultyButton w-full px-4 py-3 flex items-center justify-between border-b border-slate-700/50 hover:bg-white/5 transition" id="hardButton" type="button">
+          <span class="difficultyName flex items-center gap-2 font-bold text-rose-400"><span class="difficultyMarker w-5 text-center"></span>Difícil</span>
+          <span class="difficultyRecord text-sm text-slate-300 font-bold">Recorde 0</span>
+        </button>
+        <button class="difficultyButton impossibleButton w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition" id="impossibleButton" type="button">
+          <span class="difficultyName flex items-center gap-2 font-bold text-purple-400"><span class="difficultyMarker w-5 text-center"></span>Impossível</span>
+          <span class="difficultyRecord text-sm text-slate-300 font-bold">Recorde 0</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Skins Modal -->
+<div id="skinsModal" class="fixed inset-0 z-50 hidden modal-backdrop flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">🍰</span>
+        <h2 class="text-2xl font-black text-white">Loja de Skins</h2>
+      </div>
+      <button id="closeSkinsModal" class="w-9 h-9 bg-slate-800 hover:bg-slate-700 rounded-full flex items-center justify-center text-slate-300 font-bold transition">✕</button>
+    </div>
+
+    <div class="bg-amber-500/10 border-b border-amber-500/20 px-6 py-3 flex justify-between items-center">
+      <span class="text-sm font-semibold text-amber-200">Suas Moedas:</span>
+      <div class="flex items-center gap-1.5 font-bold text-amber-400 text-lg">
+        <span>🪙</span>
+        <span id="modalCoins">0</span>
+      </div>
+    </div>
+
+    <div id="skinsList" class="p-4 overflow-y-auto space-y-3 flex-1">
+      <!-- Generated dynamically by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- Game Over Screen -->
+<div id="gameOverScreen" class="fixed inset-0 z-40 hidden flex-col items-center justify-center bg-black/80 backdrop-blur-md text-center p-6 cursor-pointer">
+  <div class="animate-bounce text-6xl mb-4">💥🎂</div>
+  <h1 class="text-5xl font-black text-rose-500 mb-2 drop-shadow-lg">Fim de Jogo!</h1>
+  <p class="text-slate-300 text-lg mb-2">Sua torre desmoronou!</p>
+  <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 my-4 w-full max-w-xs">
+    <div class="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Camadas Empilhadas</div>
+    <div id="finalScore" class="text-4xl font-black text-amber-400">0</div>
+  </div>
+  <p class="text-amber-300 font-semibold text-sm mt-2 animate-pulse">Toque na tela para recomeçar</p>
+</div>
+
+<script>
+// Canvas & Context Setup
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+// DOM Elements
+const scoreElement = document.getElementById("score");
+const coinsElement = document.getElementById("coins");
+const modalCoinsElement = document.getElementById("modalCoins");
+const messageElement = document.getElementById("message");
+const stageBadge = document.getElementById("stageBadge");
+const pauseButton = document.getElementById("pauseButton");
+const resetButton = document.getElementById("resetButton");
+const startScreen = document.getElementById("startScreen");
+const gameOverScreen = document.getElementById("gameOverScreen");
+const finalScoreElement = document.getElementById("finalScore");
+const playButton = document.getElementById("playButton");
+const easyButton = document.getElementById("easyButton");
+const normalButton = document.getElementById("normalButton");
+const hardButton = document.getElementById("hardButton");
+const impossibleButton = document.getElementById("impossibleButton");
+const skinsButton = document.getElementById("skinsButton");
+const skinsModal = document.getElementById("skinsModal");
+const closeSkinsModal = document.getElementById("closeSkinsModal");
+const skinsList = document.getElementById("skinsList");
+
+const recordDisplays = {
+  easy: easyButton.querySelector(".difficultyRecord"),
+  normal: normalButton.querySelector(".difficultyRecord"),
+  hard: hardButton.querySelector(".difficultyRecord"),
+  impossible: impossibleButton.querySelector(".difficultyRecord")
+};
+const difficultyMarkers = {
+  easy: easyButton.querySelector(".difficultyMarker"),
+  normal: normalButton.querySelector(".difficultyMarker"),
+  hard: hardButton.querySelector(".difficultyMarker"),
+  impossible: impossibleButton.querySelector(".difficultyMarker")
+};
+
+// State Variables
+let width = 0;
+let height = 0;
+let blocks = [];
+let particles = [];
+let currentBlock = null;
+let currentIsGolden = false;
+let goldenPending = false;
+
+let score = 0;
+let coins = Number.parseFloat(localStorage.getItem("blockStackCoins") || "0");
+if (!Number.isFinite(coins) || coins < 0) coins = 0;
+
+let gameOver = false;
+let paused = false;
+let started = false;
+let selectedDifficulty = "normal";
+let difficultyMultiplier = 1;
+let messageTimer = null;
+
+let records = JSON.parse(localStorage.getItem("blockStackRecords") || "{}");
+if (!records || typeof records !== "object") records = {};
+
+// Skins Configuration
+const SKINS = [
+  {
+    id: "classic",
+    name: "Bolos Clássicos",
+    desc: "Tortas e bolos tradicionais recheados de frutas e glacê.",
+    price: 0,
+    icon: "🍓",
+    palette: [
+      { top: "#f43f5e", body: "#fda4af", frosting: "#fff", accent: "#e11d48" },
+      { top: "#d97706", body: "#fcd34d", frosting: "#fff7ed", accent: "#b45309" },
+      { top: "#0284c7", body: "#7dd3fc", frosting: "#f0f9ff", accent: "#0369a1" },
+      { top: "#16a34a", body: "#86efac", frosting: "#f0fdf4", accent: "#15803d" },
+      { top: "#9333ea", body: "#d8b4fe", frosting: "#faf5ff", accent: "#7e22ce" }
+    ]
+  },
+  {
+    id: "cyberpunk",
+    name: "Cyberpunk Neon",
+    desc: "Bolos futuristas com neon holográfico e fios sintéticos.",
+    price: 50,
+    icon: "⚡",
+    palette: [
+      { top: "#06b6d4", body: "#155e75", frosting: "#22d3ee", accent: "#67e8f9" },
+      { top: "#ec4899", body: "#831843", frosting: "#f472b6", accent: "#fbcfe8" },
+      { top: "#a855f7", body: "#581c87", frosting: "#c084fc", accent: "#e9d5ff" },
+      { top: "#10b981", body: "#064e3b", frosting: "#34d399", accent: "#a7f3d0" }
+    ]
+  },
+  {
+    id: "pixel",
+    name: "Pixel Retro 8-Bit",
+    desc: "Estilo retro nostálgico dos fliperamas dos anos 80.",
+    price: 100,
+    icon: "👾",
+    palette: [
+      { top: "#ef4444", body: "#991b1b", frosting: "#fef2f2", accent: "#f87171" },
+      { top: "#eab308", body: "#854d0e", frosting: "#fefce8", accent: "#fde047" },
+      { top: "#3b82f6", body: "#1e40af", frosting: "#eff6ff", accent: "#60a5fa" }
+    ]
+  },
+  {
+    id: "donuts",
+    name: "Rosquinhas & Donuts",
+    desc: "Rosquinhas gigantes com granulados coloridos e coberturas.",
+    price: 150,
+    icon: "🍩",
+    palette: [
+      { top: "#f472b6", body: "#fbcfe8", frosting: "#fff", accent: "#ec4899" },
+      { top: "#78350f", body: "#d97706", frosting: "#fef3c7", accent: "#451a03" },
+      { top: "#a855f7", body: "#e9d5ff", frosting: "#fff", accent: "#9333ea" }
+    ]
+  },
+  {
+    id: "icecream",
+    name: "Sorvete Tropical",
+    desc: "Camadas geladinhas e refrescantes de sorvete premium.",
+    price: 250,
+    icon: "🍦",
+    palette: [
+      { top: "#38bdf8", body: "#bae6fd", frosting: "#f0f9ff", accent: "#0284c7" },
+      { top: "#f43f5e", body: "#fecdd3", frosting: "#fff1f2", accent: "#e11d48" },
+      { top: "#facc15", body: "#fef08a", frosting: "#fefce8", accent: "#ca8a04" }
+    ]
+  }
+];
+
+let unlockedSkins = JSON.parse(localStorage.getItem("blockStackUnlockedSkins") || '["classic"]');
+let activeSkinId = localStorage.getItem("blockStackActiveSkin") || "classic";
+
+// Game Constants
+const BLOCK_HEIGHT = 38;
+const INITIAL_WIDTH = 180;
+const INITIAL_MOVE_SPEED = 260;
+const SPEED_INCREASE_EVERY = 10;
+const SPEED_INCREASE_AMOUNT = 0.05;
+const WALL_BOUNCE_INCREMENT = 0.10;
+const MAX_WALL_BONUS = 0.50;
+const CAMERA_TRIGGER = 0.38;
+
+let cameraY = 0;
+let cameraTargetY = 0;
+let moveSpeed = INITIAL_MOVE_SPEED;
+
+// Cow Animation in Space Stage
+let cowX = -100;
+let cowSpeed = 40;
+
+// Audio Synthesizer
+let audioContext = null;
+let masterGain = null;
+
+function initAudio() {
+  if (!audioContext) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    audioContext = new AudioCtx();
+    masterGain = audioContext.createGain();
+    masterGain.gain.value = 0.2;
+    masterGain.connect(audioContext.destination);
+  }
+  if (audioContext.state === "suspended") {
+    audioContext.resume().catch(() => {});
+  }
+}
+
+function playTone(freq, duration, type = "sine", vol = 0.1, delay = 0) {
+  if (!audioContext || !masterGain) return;
+  const now = audioContext.currentTime + delay;
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(Math.max(vol, 0.001), now + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  osc.connect(gain);
+  gain.connect(masterGain);
+
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+}
+
+function playPlaceSound() {
+  playTone(520, 0.08, "triangle", 0.12);
+  playTone(780, 0.10, "triangle", 0.08, 0.045);
+}
+
+function playWallBounceSound() {
+  playTone(200, 0.045, "square", 0.05);
+}
+
+function playGoldenAppearSound() {
+  playTone(660, 0.12, "triangle", 0.10);
+  playTone(880, 0.14, "triangle", 0.11, 0.10);
+  playTone(1320, 0.22, "sine", 0.13, 0.22);
+}
+
+function playGoldenSuccessSound() {
+  playTone(660, 0.10, "triangle", 0.10);
+  playTone(880, 0.10, "triangle", 0.11, 0.08);
+  playTone(1100, 0.14, "triangle", 0.12, 0.16);
+  playTone(1760, 0.28, "sine", 0.13, 0.28);
+}
+
+function playGoldenLostSound() {
+  playTone(440, 0.10, "sine", 0.08);
+  playTone(330, 0.16, "sine", 0.07, 0.10);
+}
+
+function playGameOverSound() {
+  playTone(330, 0.14, "sawtooth", 0.08);
+  playTone(220, 0.22, "sawtooth", 0.07, 0.14);
+}
+
+function playUIClickSound() {
+  playTone(620, 0.045, "triangle", 0.07);
+  playTone(880, 0.055, "triangle", 0.045, 0.025);
+}
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+
+function createCakeSliceParticles(x, y, color) {
+  for (let i = 0; i < 12; i++) {
+    particles.push({
+      x: x + Math.random() * 20 - 10,
+      y: y,
+      vx: (Math.random() - 0.5) * 160,
+      vy: -Math.random() * 120 - 40,
+      color: color,
+      size: Math.random() * 6 + 3,
+      alpha: 1,
+      life: 1
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 380 * dt;
+    p.life -= dt * 1.5;
+    p.alpha = Math.max(0, p.life);
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y + cameraY, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function formatCoins(val) {
+  return Number.isInteger(val) ? String(val) : val.toFixed(1);
+}
+
+function showTemporaryMessage(text) {
+  if (messageTimer) clearTimeout(messageTimer);
+  messageElement.textContent = text;
+  messageTimer = setTimeout(() => {
+    messageElement.textContent = "Toque na tela para colocar a camada de bolo";
+  }, 3000);
+}
+
+function updateStageBadge(scoreVal) {
+  if (activeSkinId === "cyberpunk") {
+    if (scoreVal < 25) {
+      stageBadge.textContent = "1. Neon Alley 🌃";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-cyan-600 text-white font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md";
+    } else if (scoreVal < 50) {
+      stageBadge.textContent = "2. Cyber District 🏙️";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-fuchsia-600 text-white font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md";
+    } else if (scoreVal < 75) {
+      stageBadge.textContent = "3. Holo Sky 🔮";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-violet-600 text-white font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md";
+    } else if (scoreVal < 100) {
+      stageBadge.textContent = "4. Cyberspace 👾";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-emerald-500 text-black font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md";
+    } else {
+      stageBadge.textContent = "5. Data Singularity 🕳️⚡";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-pink-600 text-white font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md animate-pulse";
+    }
+  } else {
+    if (scoreVal < 25) {
+      stageBadge.textContent = "1. Subterrâneo 🪨";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-amber-800 text-amber-100 font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md";
+    } else if (scoreVal < 50) {
+      stageBadge.textContent = "2. Grama & Céu 🌿";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-emerald-500 text-emerald-950 font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md";
+    } else if (scoreVal < 75) {
+      stageBadge.textContent = "3. Alta Atmosfera ☁️";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-sky-400 text-sky-950 font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md";
+    } else if (scoreVal < 100) {
+      stageBadge.textContent = "4. Espaço Sideral 🌌";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-purple-600 text-white font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md";
+    } else {
+      stageBadge.textContent = "5. Buraco Negro 🕳️🐮";
+      stageBadge.className = "inline-block mt-1 px-3 py-0.5 bg-pink-600 text-white font-extrabold text-xs rounded-full uppercase tracking-widest shadow-md animate-pulse";
+    }
+  }
+}
+
+function updateRecordDisplay() {
+  ["easy", "normal", "hard", "impossible"].forEach(name => {
+    const record = Number(records[name] || 0);
+    recordDisplays[name].textContent = "Recorde " + record;
+    difficultyMarkers[name].textContent = name === selectedDifficulty ? "★" : "";
+  });
+}
+
+function selectDifficulty(name, mult) {
+  selectedDifficulty = name;
+  difficultyMultiplier = mult;
+
+  easyButton.classList.toggle("selected", name === "easy");
+  normalButton.classList.toggle("selected", name === "normal");
+  hardButton.classList.toggle("selected", name === "hard");
+  impossibleButton.classList.toggle("selected", name === "impossible");
+
+  updateRecordDisplay();
+}
+
+function renderSkinsModal() {
+  modalCoinsElement.textContent = formatCoins(coins);
+  skinsList.innerHTML = "";
+
+  SKINS.forEach(skin => {
+    const isUnlocked = unlockedSkins.includes(skin.id);
+    const isActive = activeSkinId === skin.id;
+
+    const item = document.createElement("div");
+    item.className = `p-4 rounded-2xl border flex items-center justify-between transition ${
+      isActive ? 'bg-amber-500/20 border-amber-500' : 'bg-slate-800/60 border-slate-700'
+    }`;
+
+    item.innerHTML = `
+      <div class="flex items-center gap-3">
+        <div class="text-3xl p-2 bg-slate-900 rounded-xl">${skin.icon}</div>
+        <div>
+          <div class="font-bold text-white text-base">${skin.name}</div>
+          <div class="text-xs text-slate-400">${skin.desc}</div>
+        </div>
+      </div>
+      <div>
+        ${
+          isActive
+            ? `<span class="px-3 py-1.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl uppercase">Em Uso</span>`
+            : isUnlocked
+            ? `<button onclick="equipSkin('${skin.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs rounded-xl transition">Equipar</button>`
+            : `<button onclick="buySkin('${skin.id}', ${skin.price})" class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-1">
+                <span>🪙</span> ${skin.price}
+              </button>`
+        }
+      </div>
+    `;
+    skinsList.appendChild(item);
+  });
+}
+
+function equipSkin(id) {
+  activeSkinId = id;
+  localStorage.setItem("blockStackActiveSkin", id);
+  renderSkinsModal();
+  playUIClickSound();
+  // Atualiza o badge imediatamente se estiver em jogo
+  if (started) updateStageBadge(score);
+}
+
+function buySkin(id, price) {
+  if (coins >= price) {
+    coins -= price;
+    localStorage.setItem("blockStackCoins", String(coins));
+    unlockedSkins.push(id);
+    localStorage.setItem("blockStackUnlockedSkins", JSON.stringify(unlockedSkins));
+    activeSkinId = id;
+    localStorage.setItem("blockStackActiveSkin", id);
+    coinsElement.textContent = formatCoins(coins);
+    renderSkinsModal();
+    playGoldenSuccessSound();
+    if (started) updateStageBadge(score);
+  } else {
+    playGoldenLostSound();
+  }
+}
+
+function returnToStartScreen() {
+  started = false;
+  gameOver = false;
+  paused = false;
+  currentBlock = null;
+  currentIsGolden = false;
+  goldenPending = false;
+  blocks = [];
+  particles = [];
+  score = 0;
+  cameraY = 0;
+  cameraTargetY = 0;
+  moveSpeed = INITIAL_MOVE_SPEED;
+
+  scoreElement.textContent = "0";
+  coinsElement.textContent = formatCoins(coins);
+  messageElement.textContent = "Toque na tela para colocar a camada de bolo";
+  pauseButton.style.display = "none";
+  resetButton.style.display = "none";
+  updatePauseButton();
+  startScreen.style.display = "flex";
+  skinsButton.style.display = "block";
+  gameOverScreen.style.display = "none";
+}
+
+function startGame() {
+  initAudio();
+  started = true;
+  startScreen.style.display = "none";
+  skinsButton.style.display = "none";
+  gameOverScreen.style.display = "none";
+  pauseButton.style.display = "flex";
+  resetButton.style.display = "flex";
+
+  score = 0;
+  gameOver = false;
+  paused = false;
+  goldenPending = false;
+  particles = [];
+
+  if (messageTimer) { clearTimeout(messageTimer); messageTimer = null; }
+
+  blocks = [];
+  cameraY = 0;
+  cameraTargetY = 0;
+  moveSpeed = INITIAL_MOVE_SPEED * difficultyMultiplier;
+
+  const baseX = (width - INITIAL_WIDTH) / 2;
+  const baseWorldY = height - 80;
+
+  blocks.push({
+    x: baseX,
+    worldY: baseWorldY,
+    width: INITIAL_WIDTH,
+    height: BLOCK_HEIGHT,
+    colorIndex: 0,
+    decorType: 0
+  });
+
+  createNextBlock();
+
+  scoreElement.textContent = score;
+  coinsElement.textContent = formatCoins(coins);
+  messageElement.textContent = "Toque na tela para colocar a camada de bolo";
+  updateStageBadge(score);
+  updatePauseButton();
+}
+
+function createNextBlock() {
+  const previous = blocks[blocks.length - 1];
+  const isGolden = goldenPending;
+  goldenPending = false;
+  currentIsGolden = isGolden;
+
+  const nextWidth = isGolden ? Math.min(width, previous.width * 2) : previous.width;
+  const direction = Math.random() < 0.5 ? 1 : -1;
+
+  if (isGolden) {
+    if (messageTimer) { clearTimeout(messageTimer); messageTimer = null; }
+    messageElement.textContent = "Bolo Dourado de Recompensa!";
+    playGoldenAppearSound();
+  }
+
+  const currentSkin = SKINS.find(s => s.id === activeSkinId) || SKINS[0];
+  const colorIdx = Math.floor(Math.random() * currentSkin.palette.length);
+
+  currentBlock = {
+    x: direction === 1 ? 0 : width - nextWidth,
+    worldY: previous.worldY - BLOCK_HEIGHT,
+    width: nextWidth,
+    height: BLOCK_HEIGHT,
+    direction,
+    golden: isGolden,
+    wallBonus: 0,
+    speed: isGolden ? moveSpeed * 1.5 : moveSpeed,
+    colorIndex: colorIdx,
+    decorType: Math.floor(Math.random() * 4)
+  };
+}
+
+function updateCamera() {
+  if (!currentBlock) return;
+  const triggerY = height * CAMERA_TRIGGER;
+  const screenY = currentBlock.worldY + cameraY;
+
+  if (screenY < triggerY) {
+    cameraTargetY = triggerY - currentBlock.worldY;
+  }
+  cameraY += (cameraTargetY - cameraY) * 0.10;
+}
+
+function update(dt) {
+  if (!started || gameOver || paused || !currentBlock) return;
+
+  cowX += cowSpeed * dt;
+  if (cowX > width + 100) cowX = -100;
+
+  if (currentIsGolden) {
+    currentBlock.speed = moveSpeed * 1.5;
+    currentBlock.x += currentBlock.direction * currentBlock.speed * dt;
+  } else {
+    currentBlock.speed = moveSpeed * (1 + currentBlock.wallBonus);
+    currentBlock.x += currentBlock.direction * currentBlock.speed * dt;
+
+    if (currentBlock.x + currentBlock.width >= width) {
+      currentBlock.x = width - currentBlock.width;
+      currentBlock.direction = -1;
+      currentBlock.wallBonus = Math.min(MAX_WALL_BONUS, currentBlock.wallBonus + WALL_BOUNCE_INCREMENT);
+      playWallBounceSound();
+    }
+
+    if (currentBlock.x <= 0) {
+      currentBlock.x = 0;
+      currentBlock.direction = 1;
+      currentBlock.wallBonus = Math.min(MAX_WALL_BONUS, currentBlock.wallBonus + WALL_BOUNCE_INCREMENT);
+      playWallBounceSound();
+    }
+  }
+
+  updateParticles(dt);
+  updateCamera();
+}
+
+function placeBlock() {
+  if (!started || gameOver || paused || !currentBlock) return;
+
+  const previous = blocks[blocks.length - 1];
+  const current = currentBlock;
+
+  if (currentIsGolden) {
+    const previousLeft = previous.x;
+    const previousRight = previous.x + previous.width;
+    const currentLeft = current.x;
+    const currentRight = current.x + current.width;
+
+    const overlapWidth = Math.min(previousRight, currentRight) - Math.max(previousLeft, currentLeft);
+
+    if (overlapWidth <= 0) {
+      currentBlock = null;
+      currentIsGolden = false;
+      playGoldenLostSound();
+      showTemporaryMessage("Bolo dourado perdido!");
+      createNextBlock();
+      updateCamera();
+      return;
+    }
+
+    blocks.push({
+      x: (width - current.width) / 2,
+      worldY: current.worldY,
+      width: current.width,
+      height: BLOCK_HEIGHT,
+      golden: true,
+      colorIndex: current.colorIndex,
+      decorType: current.decorType
+    });
+
+    coins += 3 * difficultyMultiplier;
+    localStorage.setItem("blockStackCoins", String(coins));
+    coinsElement.textContent = formatCoins(coins);
+
+    currentBlock = null;
+    currentIsGolden = false;
+    playGoldenSuccessSound();
+    showTemporaryMessage("Bolo Dourado colocado! Base expandida!");
+    createNextBlock();
+    updateCamera();
+    return;
+  }
+
+  const previousLeft = previous.x;
+  const previousRight = previous.x + previous.width;
+  const currentLeft = current.x;
+  const currentRight = current.x + current.width;
+
+  const overlapLeft = Math.max(previousLeft, currentLeft);
+  const overlapRight = Math.min(previousRight, currentRight);
+  const overlapWidth = overlapRight - overlapLeft;
+
+  if (overlapWidth <= 0) {
+    playGameOverSound();
+    gameOver = true;
+    paused = false;
+    messageElement.textContent = "A torre de bolos caiu!";
+    finalScoreElement.textContent = score;
+    pauseButton.style.display = "none";
+    resetButton.style.display = "none";
+    gameOverScreen.style.display = "flex";
+    return;
+  }
+
+  if (currentLeft < previousLeft) {
+    createCakeSliceParticles(currentLeft, current.worldY, "#f43f5e");
+  }
+  if (currentRight > previousRight) {
+    createCakeSliceParticles(overlapRight, current.worldY, "#f43f5e");
+  }
+
+  const newBlock = {
+    x: overlapLeft,
+    worldY: current.worldY,
+    width: overlapWidth,
+    height: BLOCK_HEIGHT,
+    colorIndex: current.colorIndex,
+    decorType: current.decorType
+  };
+
+  blocks.push(newBlock);
+  playPlaceSound();
+
+  score++;
+  updateStageBadge(score);
+
+  const currentRecord = Number(records[selectedDifficulty] || 0);
+  if (score > currentRecord) {
+    records[selectedDifficulty] = score;
+    localStorage.setItem("blockStackRecords", JSON.stringify(records));
+    updateRecordDisplay();
+  }
+
+  coins += difficultyMultiplier;
+  localStorage.setItem("blockStackCoins", String(coins));
+  scoreElement.textContent = score;
+  coinsElement.textContent = formatCoins(coins);
+
+  if (score % SPEED_INCREASE_EVERY === 0) {
+    moveSpeed *= (1 + SPEED_INCREASE_AMOUNT);
+    goldenPending = true;
+  }
+
+  createNextBlock();
+}
+
+function drawBackground() {
+  ctx.save();
+
+  const isCyber = activeSkinId === "cyberpunk";
+
+  // ========== CYBERPUNK BACKGROUNDS ==========
+  if (isCyber) {
+    // STAGE 1: Neon Alley (0-24)
+    if (score < 25) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, "#0a0a12");
+      grad.addColorStop(0.5, "#0f0a1a");
+      grad.addColorStop(1, "#1a0a18");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Vertical neon signs / rain lines
+      for (let i = 0; i < 18; i++) {
+        const x = (i * 73 + 20) % width;
+        ctx.strokeStyle = i % 3 === 0 ? "#22d3ee33" : (i % 3 === 1 ? "#f472b633" : "#a855f733");
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + (i % 5 - 2), height);
+        ctx.stroke();
+      }
+
+      // Horizontal neon glow bars
+      ctx.fillStyle = "#22d3ee15";
+      ctx.fillRect(0, height * 0.3, width, 3);
+      ctx.fillStyle = "#ec489915";
+      ctx.fillRect(0, height * 0.55, width, 2);
+      ctx.fillStyle = "#a855f715";
+      ctx.fillRect(0, height * 0.75, width, 4);
+    }
+    // STAGE 2: Cyber District (25-49)
+    else if (score < 50) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, "#050510");
+      grad.addColorStop(0.6, "#0c0a1f");
+      grad.addColorStop(1, "#1a0a2e");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // City skyline silhouettes
+      ctx.fillStyle = "#0a0a18";
+      for (let i = 0; i < 12; i++) {
+        const bx = (i * 90) % (width + 40) - 20;
+        const bh = 80 + (i % 5) * 40;
+        ctx.fillRect(bx, height - bh - 40, 50 + (i % 3) * 20, bh);
+      }
+
+      // Neon windows
+      ctx.fillStyle = "#22d3ee88";
+      for (let i = 0; i < 30; i++) {
+        const wx = (i * 47 + 15) % width;
+        const wy = height - 60 - ((i * 31) % 180);
+        ctx.fillRect(wx, wy, 4, 6);
+      }
+
+      // Flying neon orbs
+      ctx.fillStyle = "#f472b6aa";
+      ctx.beginPath();
+      ctx.arc(width * 0.2, 120, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#22d3eeaa";
+      ctx.beginPath();
+      ctx.arc(width * 0.75, 90, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // STAGE 3: Holo Sky (50-74)
+    else if (score < 75) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, "#020008");
+      grad.addColorStop(0.4, "#0a0520");
+      grad.addColorStop(1, "#120a2a");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Holographic grid
+      ctx.strokeStyle = "#22d3ee22";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // Big holographic moon / orb
+      const hx = width - 90;
+      const hy = 100;
+      const holoGrad = ctx.createRadialGradient(hx, hy, 10, hx, hy, 55);
+      holoGrad.addColorStop(0, "#22d3ee");
+      holoGrad.addColorStop(0.5, "#a855f788");
+      holoGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = holoGrad;
+      ctx.beginPath();
+      ctx.arc(hx, hy, 55, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // STAGE 4: Cyberspace (75-99)
+    else if (score < 100) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, "#000005");
+      grad.addColorStop(0.5, "#050018");
+      grad.addColorStop(1, "#0a0020");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Digital stars / data points
+      for (let i = 0; i < 60; i++) {
+        const sx = (i * 97) % width;
+        const sy = (i * 53) % height;
+        ctx.fillStyle = i % 4 === 0 ? "#22d3ee" : (i % 4 === 1 ? "#f472b6" : "#a855f7");
+        ctx.fillRect(sx, sy, (i % 3) + 1, (i % 3) + 1);
+      }
+
+      // Matrix-like vertical streams
+      ctx.fillStyle = "#22d3ee18";
+      for (let i = 0; i < 10; i++) {
+        const mx = (i * 110 + 30) % width;
+        ctx.fillRect(mx, 0, 2, height);
+      }
+    }
+    // STAGE 5: Data Singularity (100+)
+    else {
+      ctx.fillStyle = "#000003";
+      ctx.fillRect(0, 0, width, height);
+
+      const bhX = width / 2;
+      const bhY = 180;
+
+      // Digital accretion disk
+      const diskGrad = ctx.createRadialGradient(bhX, bhY, 15, bhX, bhY, 150);
+      diskGrad.addColorStop(0, "#000");
+      diskGrad.addColorStop(0.2, "#22d3ee");
+      diskGrad.addColorStop(0.45, "#ec4899");
+      diskGrad.addColorStop(0.7, "#a855f7");
+      diskGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = diskGrad;
+      ctx.beginPath();
+      ctx.arc(bhX, bhY, 150, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Event horizon
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.arc(bhX, bhY, 42, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Orbiting digital cow (or glitch)
+      ctx.font = "36px sans-serif";
+      ctx.fillText("🐮", cowX, bhY + Math.sin(cowX * 0.02) * 28);
+      ctx.fillStyle = "#22d3ee";
+      ctx.font = "12px monospace";
+      ctx.fillText("ERROR_404", cowX - 10, bhY + Math.sin(cowX * 0.02) * 28 + 22);
+    }
+
+    // Cyber ground plate
+    const groundWorldY = height - 42;
+    const groundScreenY = groundWorldY + cameraY;
+    if (groundScreenY < height) {
+      ctx.fillStyle = "#0a0a14";
+      ctx.fillRect(0, groundScreenY, width, height - groundScreenY);
+      // Neon ground line
+      ctx.fillStyle = "#22d3ee";
+      ctx.shadowColor = "#22d3ee";
+      ctx.shadowBlur = 10;
+      ctx.fillRect(0, groundScreenY, width, 3);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#ec4899";
+      ctx.fillRect(0, groundScreenY + 4, width, 1);
+    }
+  }
+
+  // ========== NORMAL BACKGROUNDS (outras skins) ==========
+  else {
+    if (score < 25) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, "#1a0f0a");
+      grad.addColorStop(1, "#361c12");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = "#f59e0b22";
+      for (let i = 0; i < 6; i++) {
+        const cx = (i * 130 + 40) % width;
+        const cy = (i * 90 + 100) % height;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + 15, cy - 35);
+        ctx.lineTo(cx + 30, cy);
+        ctx.fill();
+      }
+    } else if (score < 50) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, "#38bdf8");
+      grad.addColorStop(0.7, "#bae6fd");
+      grad.addColorStop(1, "#86efac");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = "#ffffffaa";
+      ctx.beginPath();
+      ctx.arc(80, 120, 40, 0, Math.PI * 2);
+      ctx.arc(120, 110, 50, 0, Math.PI * 2);
+      ctx.arc(160, 120, 40, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(width - 100, 200, 35, 0, Math.PI * 2);
+      ctx.arc(width - 60, 190, 45, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (score < 75) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, "#090d16");
+      grad.addColorStop(0.6, "#0f172a");
+      grad.addColorStop(1, "#1e1b4b");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = "#fef08a";
+      ctx.beginPath();
+      ctx.arc(width - 80, 90, 35, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (score < 100) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, "#030014");
+      grad.addColorStop(0.5, "#0d0029");
+      grad.addColorStop(1, "#190038");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = "#ffffff";
+      for (let i = 0; i < 40; i++) {
+        const sx = (i * 97) % width;
+        const sy = (i * 53) % height;
+        ctx.fillRect(sx, sy, (i % 3) + 1, (i % 3) + 1);
+      }
+    } else {
+      ctx.fillStyle = "#020005";
+      ctx.fillRect(0, 0, width, height);
+
+      const bhX = width / 2;
+      const bhY = 180;
+
+      const grad = ctx.createRadialGradient(bhX, bhY, 20, bhX, bhY, 140);
+      grad.addColorStop(0, "#000");
+      grad.addColorStop(0.25, "#ec4899");
+      grad.addColorStop(0.6, "#8b5cf6");
+      grad.addColorStop(1, "transparent");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(bhX, bhY, 140, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#000000";
+      ctx.beginPath();
+      ctx.arc(bhX, bhY, 45, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = "38px sans-serif";
+      ctx.fillText("🐮", cowX, bhY + Math.sin(cowX * 0.02) * 30);
+    }
+
+    // Normal ground plate
+    const groundWorldY = height - 42;
+    const groundScreenY = groundWorldY + cameraY;
+    if (groundScreenY < height) {
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(0, groundScreenY, width, height - groundScreenY);
+      ctx.fillStyle = "#10b981";
+      ctx.fillRect(0, groundScreenY, width, 8);
+    }
+  }
+
+  ctx.restore();
+}
+
+// Render individual detailed cake blocks
+function drawCakeBlock(block, index) {
+  const screenY = block.worldY + cameraY;
+  if (screenY + block.height < -60 || screenY > height + 60) return;
+
+  const currentSkin = SKINS.find(s => s.id === activeSkinId) || SKINS[0];
+  const palette = currentSkin.palette[block.colorIndex % currentSkin.palette.length];
+  const skinId = currentSkin.id;
+
+  ctx.save();
+
+  if (block.golden || (block === currentBlock && currentIsGolden)) {
+    ctx.fillStyle = "#f59e0b";
+    ctx.fillRect(block.x, screenY, block.width, block.height);
+    ctx.fillStyle = "#fef08a";
+    ctx.fillRect(block.x, screenY, block.width, 10);
+    ctx.strokeStyle = "#b45309";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(block.x, screenY, block.width, block.height);
+    ctx.fillStyle = "#fff";
+    ctx.font = "14px sans-serif";
+    ctx.fillText("✨", block.x + block.width / 2 - 7, screenY + 24);
+    ctx.restore();
+    return;
+  }
+
+  if (skinId === "classic") {
+    ctx.fillStyle = palette.body;
+    ctx.fillRect(block.x, screenY, block.width, block.height);
+    ctx.fillStyle = palette.frosting;
+    ctx.fillRect(block.x, screenY, block.width, 10);
+    const dripCount = Math.floor(block.width / 20);
+    for (let i = 0; i < dripCount; i++) {
+      ctx.beginPath();
+      ctx.arc(block.x + i * 20 + 10, screenY + 10, 5, 0, Math.PI);
+      ctx.fill();
+    }
+    ctx.strokeStyle = palette.accent;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(block.x, screenY, block.width, block.height);
+
+    if (block.decorType === 0) {
+      ctx.fillStyle = "#ef4444";
+      for (let cx = block.x + 15; cx < block.x + block.width - 10; cx += 35) {
+        ctx.beginPath();
+        ctx.arc(cx, screenY - 2, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (block.decorType === 1) {
+      const colors = ["#f43f5e", "#3b82f6", "#eab308", "#10b981"];
+      for (let s = 0; s < block.width / 15; s++) {
+        ctx.fillStyle = colors[s % colors.length];
+        ctx.fillRect(block.x + s * 15 + 6, screenY + 16, 6, 3);
+      }
+    } else if (block.decorType === 2) {
+      ctx.fillStyle = "#ffffff";
+      for (let wx = block.x + 20; wx < block.x + block.width - 15; wx += 40) {
+        ctx.beginPath();
+        ctx.arc(wx, screenY + 2, 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  else if (skinId === "cyberpunk") {
+    ctx.fillStyle = palette.body;
+    ctx.fillRect(block.x, screenY, block.width, block.height);
+
+    ctx.fillStyle = palette.frosting;
+    ctx.shadowColor = palette.frosting;
+    ctx.shadowBlur = 12;
+    ctx.fillRect(block.x, screenY, block.width, 8);
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = palette.accent;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = palette.accent;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(block.x + 2, screenY + 4);
+    ctx.lineTo(block.x + 2, screenY + block.height - 4);
+    ctx.moveTo(block.x + block.width - 2, screenY + 4);
+    ctx.lineTo(block.x + block.width - 2, screenY + block.height - 4);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = palette.top;
+    for (let i = 0; i < Math.floor(block.width / 28); i++) {
+      const nx = block.x + 14 + i * 28;
+      ctx.beginPath();
+      ctx.arc(nx, screenY + 20, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.strokeStyle = palette.frosting;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(block.x, screenY, block.width, block.height);
+  }
+  else if (skinId === "pixel") {
+    ctx.fillStyle = palette.body;
+    ctx.fillRect(block.x, screenY, block.width, block.height);
+    ctx.fillStyle = palette.frosting;
+    ctx.fillRect(block.x, screenY, block.width, 12);
+    ctx.strokeStyle = palette.accent;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(block.x + 1, screenY + 1, block.width - 2, block.height - 2);
+
+    ctx.fillStyle = palette.top;
+    for (let i = 0; i < Math.floor(block.width / 16); i++) {
+      const pxPos = block.x + 8 + i * 16;
+      ctx.fillRect(pxPos, screenY + 18, 8, 8);
+    }
+    ctx.fillStyle = "#ffffff88";
+    ctx.fillRect(block.x + 4, screenY + 4, 6, 4);
+  }
+  else if (skinId === "donuts") {
+    ctx.fillStyle = palette.body;
+    ctx.beginPath();
+    ctx.roundRect(block.x, screenY, block.width, block.height, 10);
+    ctx.fill();
+
+    ctx.fillStyle = palette.frosting;
+    ctx.beginPath();
+    ctx.roundRect(block.x + 2, screenY, block.width - 4, 14, [10, 10, 0, 0]);
+    ctx.fill();
+
+    const sprinkleColors = ["#ef4444", "#3b82f6", "#eab308", "#10b981", "#ec4899", "#8b5cf6"];
+    for (let i = 0; i < Math.floor(block.width / 12); i++) {
+      ctx.fillStyle = sprinkleColors[i % sprinkleColors.length];
+      const sx = block.x + 8 + i * 12;
+      const sy = screenY + 6 + (i % 3) * 3;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate((i % 2 === 0 ? 1 : -1) * 0.4);
+      ctx.fillRect(-3, -1.5, 6, 3);
+      ctx.restore();
+    }
+
+    ctx.strokeStyle = palette.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(block.x, screenY, block.width, block.height, 10);
+    ctx.stroke();
+  }
+  else if (skinId === "icecream") {
+    ctx.fillStyle = palette.body;
+    ctx.beginPath();
+    ctx.roundRect(block.x, screenY, block.width, block.height, 8);
+    ctx.fill();
+
+    ctx.fillStyle = palette.frosting;
+    ctx.fillRect(block.x, screenY, block.width, 12);
+
+    const dripCount = Math.floor(block.width / 18);
+    for (let i = 0; i < dripCount; i++) {
+      ctx.beginPath();
+      ctx.ellipse(block.x + 9 + i * 18, screenY + 14, 7, 9, 0, 0, Math.PI);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#ffffff55";
+    ctx.beginPath();
+    ctx.ellipse(block.x + block.width * 0.3, screenY + 6, 12, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (block.decorType % 2 === 0) {
+      ctx.fillStyle = "#ef4444";
+      ctx.beginPath();
+      ctx.arc(block.x + block.width / 2, screenY - 1, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#166534";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(block.x + block.width / 2, screenY - 6);
+      ctx.quadraticCurveTo(block.x + block.width / 2 + 4, screenY - 14, block.x + block.width / 2 + 8, screenY - 10);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = palette.accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(block.x, screenY, block.width, block.height, 8);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, width, height);
+  drawBackground();
+
+  for (let i = 0; i < blocks.length; i++) {
+    drawCakeBlock(blocks[i], i);
+  }
+
+  if (currentBlock && !gameOver) {
+    drawCakeBlock(currentBlock, blocks.length);
+  }
+
+  drawParticles();
+}
+
+let lastTime = performance.now();
+function gameLoop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function updatePauseButton() {
+  pauseButton.textContent = paused ? "▶" : "Ⅱ";
+}
+
+function togglePause() {
+  if (!started || gameOver) return;
+  paused = !paused;
+  messageElement.textContent = paused ? "Jogo Pausado" : "Toque na tela para colocar a camada de bolo";
+  updatePauseButton();
+}
+
+// Event Listeners
+canvas.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  initAudio();
+  if (gameOver) {
+    returnToStartScreen();
+    return;
+  }
+  placeBlock();
+});
+
+gameOverScreen.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  returnToStartScreen();
+});
+
+playButton.addEventListener("click", e => {
+  e.stopPropagation();
+  startGame();
+});
+
+skinsButton.addEventListener("click", e => {
+  e.stopPropagation();
+  renderSkinsModal();
+  skinsModal.classList.remove("hidden");
+});
+
+closeSkinsModal.addEventListener("click", () => {
+  skinsModal.classList.add("hidden");
+});
+
+easyButton.addEventListener("click", () => selectDifficulty("easy", 0.5));
+normalButton.addEventListener("click", () => selectDifficulty("normal", 1.0));
+hardButton.addEventListener("click", () => selectDifficulty("hard", 1.5));
+impossibleButton.addEventListener("click", () => selectDifficulty("impossible", 2.0));
+
+pauseButton.addEventListener("click", e => {
+  e.stopPropagation();
+  togglePause();
+  pauseButton.blur();
+});
+
+resetButton.addEventListener("click", e => {
+  e.stopPropagation();
+  if (started && !gameOver && confirm("Deseja reiniciar a partida atual?")) {
+    returnToStartScreen();
+  }
+  resetButton.blur();
+});
+
+document.addEventListener("keydown", e => {
+  if (e.repeat) return;
+  if (e.code === "Space" || e.key === " ") {
+    e.preventDefault();
+    placeBlock();
+  } else if (e.code === "Enter" || e.key === "Enter") {
+    e.preventDefault();
+    if (gameOver) returnToStartScreen();
+    else togglePause();
+  }
+});
+
+// Initial Setup
+selectDifficulty("normal", 1.0);
+coinsElement.textContent = formatCoins(coins);
+pauseButton.style.display = "none";
+resetButton.style.display = "none";
+gameOverScreen.style.display = "none";
+
+resize();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
